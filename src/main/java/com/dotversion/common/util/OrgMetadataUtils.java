@@ -14,6 +14,7 @@ import java.util.ServiceLoader;
 import java.util.zip.ZipInputStream;
 
 import com.dotversion.common.DotVersionConstants;
+import com.dotversion.dto.DifferenceSummary;
 import com.dotversion.forcediff.core.JaxbUnmarshallerCache;
 import com.dotversion.forcediff.core.MetadataFactory;
 import com.dotversion.forcediff.core.NodeDifference;
@@ -215,6 +216,9 @@ public class OrgMetadataUtils {
 		    		ObjectMapper objectMapper =new ObjectMapper();
 		    		objectMapper.setSerializationInclusion(Inclusion.NON_NULL);
 		    		String jsonStr = objectMapper.writeValueAsString(bkpDiff.getDiffDetail());
+		    		DifferenceSummary smry = DifferenceUtils.summarizeDifferences(jsonStr);
+		    		sts.setStatusMsg(smry.toString());
+		    		sts.setChangeCount(smry.getDetails().size());
 		    		writeChangesToRedis(sts.getVersionId(),jsonStr);
 	    		}
 	    	}

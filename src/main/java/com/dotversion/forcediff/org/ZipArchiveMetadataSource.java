@@ -103,19 +103,4 @@ public class ZipArchiveMetadataSource  implements MetadataSource {
 		return objName;
 	}
 
-	public static void main(String args[]) throws Exception{
-		ZipInputStream theZip = new ZipInputStream(new FileInputStream(args[0]));
-		ZipArchiveMetadataSource zipSource = new ZipArchiveMetadataSource("org1",theZip);
-		MetadataXmlFile xmlData = zipSource.getNextMetadataObject();
-		String currLine;
-		while(xmlData!=null){
-			BufferedReader reader = new BufferedReader(new InputStreamReader(xmlData.getFileContents()));
-			while((currLine=reader.readLine())!=null){
-				System.out.println(String.format("Metadata Type:%s,Name=%s,>>>>>%s",xmlData.getMetadataType(),xmlData.getName(),currLine));
-			}
-			xmlData = zipSource.getNextMetadataObject();
-		}
-		
-
-	}
 }
