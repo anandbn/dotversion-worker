@@ -33,6 +33,7 @@ import com.dotversion.services.OrgBackupDataService;
 import com.dotversion.services.impl.DBUtils;
 import com.dotversion.utils.ZipUtils;
 import com.dotversion.forcediff.core.CombinedNodeDifference;
+import com.salesforce.metadata.CustomObject;
 import com.salesforce.metadata.Layout;
 import com.salesforce.metadata.LayoutSection;
 import com.salesforce.metadata.Metadata;
@@ -97,10 +98,29 @@ public class OrgMetadataUtils {
         ObjectMapper objectMapper = new ObjectMapper();
 		objectMapper.setSerializationInclusion(Inclusion.NON_NULL);
 		objectMapper.writeValue(new File("/Users/anandbashyamnarasimhan/scratchpad/dotversion/diff.json"),diff);
+		*/
 		
-		User usr = dbUtils.findUser("");
-		//SalesforceOrg org = dbUtils.findOrganizationByOrgId("00DA0000000YjLPMA0");
-		backupOrg(usr.getSalesforceOrgs().get(0));
+		Class<? extends com.salesforce.metadata.Metadata> clsName = MetadataFactory.getMetadataClass("objects");
+		File layout = new File("/private/var/folders/wj/cbg8dc0x7zd8jj4y59r0r_6dk5jdx1/T/00DA0000000KivOMAS/unpackaged/objects/Test_Article_T__kav.object");
+        CustomObject obj1 = (CustomObject) JaxbUnmarshallerCache.unmarshallerFor(clsName)
+				  											  .unmarshal(layout);
+        
+        layout = new File("/private/var/folders/wj/cbg8dc0x7zd8jj4y59r0r_6dk5jdx1/T/00DA0000000KivOMAS-new/unpackaged/objects/Test_Article_T__kav.object");
+        CustomObject obj2 = (CustomObject) JaxbUnmarshallerCache.unmarshallerFor(clsName)
+				  .unmarshal(layout);
+
+        
+        StandardNode node1 =(StandardNode) MetadataFactory.getNodeInstance(obj1);
+        StandardNode node2 =(StandardNode) MetadataFactory.getNodeInstance(obj2);
+        
+        NodeDifference diff =NodeDifferenceFinder.getInstance().findDifferences(node1, node2);
+
+        System.out.println(">>>>>>"+diff);
+
+		/*
+		//User usr = dbUtils.findUser("vasub@yahoo.com");
+		SalesforceOrg org = dbUtils.findOrganizationByOrgId("00DA0000000KivOMAS");
+		backupOrg(org);
 		*/
 		
 	}

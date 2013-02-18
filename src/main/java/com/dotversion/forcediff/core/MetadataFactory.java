@@ -172,6 +172,9 @@ public class MetadataFactory {
         	return new StandardNode(metadataObj,((LayoutSectionTranslation)metadataObj).getLabel(),"label");
         }else if(metadataObj instanceof RecordTypeTranslation){
         	return new StandardNode(metadataObj,((RecordTypeTranslation)metadataObj).getLabel(),"label");
+        }else if(metadataObj instanceof ArticleTypeTemplate){
+          	return new StandardNode(metadataObj,((ArticleTypeTemplate)metadataObj).getChannel().toString(),"channel");
+        	
         }else if(metadataObj instanceof WorkflowEmailRecipient){
         	WorkflowEmailRecipient obj = (WorkflowEmailRecipient)metadataObj;
         	if(obj.getRecipient()!=null){

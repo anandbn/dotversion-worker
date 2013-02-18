@@ -1,6 +1,8 @@
 package com.dotversion.utils;
 
 import org.apache.commons.io.FileUtils;
+import org.codehaus.jackson.map.ObjectMapper;
+import org.codehaus.jackson.map.annotate.JsonSerialize.Inclusion;
 
 import com.dotversion.forcediff.core.MetadataDirectoryNode;
 import com.dotversion.forcediff.core.MetadataReader;
@@ -14,12 +16,34 @@ import java.io.*;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 public class CustomFieldReferences {
-	private PrintWriter fileOut;
-	public static void main(String args[]) throws Exception{
-		
-		CustomFieldReferences refs = new CustomFieldReferences();
-		Map<String,List<Method>> clzAndMethods = refs.initFieldReferences(args[0]);
+	private static PrintWriter fileOut;
+	private static final String METHODS_RETURNING_LISTS_STR = "public java\\.util\\.List<(.*)> (.*)()";
+	private static final Pattern METHODS_RETURNING_LISTS = Pattern.compile(METHODS_RETURNING_LISTS_STR);
+	private static final String METHODS_RETURNING_METADATA_STR="public (.*) (.*)()";
+	private static final Pattern METHODS_RETURNING_METADATA = Pattern.compile(METHODS_RETURNING_METADATA_STR);
+	private static final String STATIC_METHODS_STR = "public static .*";
+	private static final Pattern STATIC_METHODS = Pattern.compile(STATIC_METHODS_STR);
+	public static void main(String args[]){
+		fileOut=null;
+		try{
+			CustomFieldReferences refs = new CustomFieldReferences();
+			fileOut = new PrintWriter(new File("methodTree.json"));
+			Map<String,List<MethodsToInvoke>> clzAndMethods = refs.initFieldReferences(args[0]);
+			ObjectMapper objectMapper =new ObjectMapper();
+			objectMapper.setSerializationInclusion(Inclusion.NON_NULL);
+			String jsonStr = objectMapper.writeValueAsString(clzAndMethods);
+			fileOut.println(jsonStr);
+			fileOut.flush();
+			
+		}catch(Exception ex){
+			fileOut.println(ex.getMessage());
+		}finally{
+			fileOut.close();
+		}
+
 		/*
 		DirectoryMetadataSource source = new DirectoryMetadataSource("current","/Users/anarasimhan/tmp/fdc-00dt0000000gmupmao/unpackaged");
         MetadataXmlFile xmlData;
@@ -56,20 +80,21 @@ public class CustomFieldReferences {
 			System.out.println(String.format("Class:%s has no 'field' references",clzName));
 		}
 	}
-	public Map<String, List<Method>> initFieldReferences(String baseDir) throws Exception{
+	public Map<String, List<MethodsToInvoke>> initFieldReferences(String baseDir) throws Exception{
 		@SuppressWarnings("unchecked")
 		Collection<File> fileList = FileUtils.listFiles(new File(baseDir),null,true);
 		Iterator<File> fileItr = fileList.iterator();
-		Map<String,List<Method>> clzAndMethods  = new HashMap<String,List<Method>>();
-		List<Method> methods;
+		Map<String,List<MethodsToInvoke>> clzAndMethods  = new HashMap<String,List<MethodsToInvoke>>();
+		List<MethodsToInvoke> methods;
 		while(fileItr.hasNext()){
 			String fileName = fileItr.next().getName();
 			fileName = fileName.substring(0, fileName.length()-5);
 			String metaClassName = String.format("com.salesforce.metadata.%s",fileName);
-			
-			methods = initFieldReferencesForClass(metaClassName);
-			if(methods!= null){
-				clzAndMethods.put(metaClassName, methods);
+			if(!fileName.equals("DataCategory")){
+				methods = initFieldReferencesForClass(metaClassName);
+				if(methods!= null){
+					clzAndMethods.put(metaClassName, methods);
+				}
 			}
 			
 		}
@@ -77,48 +102,56 @@ public class CustomFieldReferences {
 
 	}
 	
-	private  List<Method> initFieldReferencesForClass(String metaClassName) throws ClassNotFoundException{
+	private  List<MethodsToInvoke> initFieldReferencesForClass(String metaClassName) throws ClassNotFoundException{
 		@SuppressWarnings("unchecked")
 		Class<? extends Metadata> cls = (Class<? extends Metadata>) Class.forName(metaClassName);
 		List<Method> methods=null;
-        for (Method accessorMethod: getAccessorMethods(cls)) {
-            String name = parseAccessorVariableName(accessorMethod.getName());
-            if(name.indexOf("field")>=0 || name.indexOf("Field")>=0){
-            	if(methods ==null){
-            		methods = new ArrayList<Method>();
-            	}
-            	methods.add(accessorMethod);
-            	//System.out.println(String.format("%s.%s() has a  'field' reference.",metaClassName,name,accessorMethod.getName()));
-            }else{
-            	//System.out.println(String.format("%s.%s() has no 'field' references",metaClassName,name,accessorMethod.getName()));
-            	
-            }
-        }
-        return methods;
+        return getAccessorMethods(cls);
 		
 	}
 	
-    private  List<Method> getAccessorMethods(Class<? extends Object> cls) {
+    private  List<MethodsToInvoke> getAccessorMethods(Class<? extends Object> cls) throws ClassNotFoundException {
         Method methods[] = cls.getDeclaredMethods();
-        List<Method> accessorMethods = new ArrayList<Method>();
- 	        for (Method method: methods) {
-	            String methodName = method.getName();
-	            if ((methodName.startsWith("get") || methodName.startsWith("is")) && method.getReturnType().equals(String.class)) {
-	            	fileOut.println(String.format("%s;%s;%s",cls.getName(),method.getName(),method.getReturnType().getName()));
-	            	if (method.getParameterTypes().length == 0) {
-	                    accessorMethods.add(method);
-	                }
-	            }else{
-	            	fileOut.println(String.format("%s;%s;%s",cls.getName(),method.getName(),method.getReturnType().getName()));
-	            	if(method.getName().equalsIgnoreCase("getFields")){
-	            		Class clz = method.getReturnType().getClass();
-	            		
-	            		System.out.println("");
-	     
-	            	}
-	            }
-	        }
-        return accessorMethods;
+        List<MethodsToInvoke> accessorMethods = new ArrayList<MethodsToInvoke>();
+        for (Method method: methods) {
+            String methodName = method.getName();
+            //Skip static methods
+            if(!Pattern.matches(STATIC_METHODS_STR, method.toGenericString())){
+                if ((methodName.startsWith("get") || methodName.startsWith("is")) && method.getReturnType().equals(String.class)) {
+                	fileOut.println(String.format("%s;%s;%s",cls.getName(),method.getName(),method.getReturnType().getName()));
+                	fileOut.flush();
+                	if (method.getParameterTypes().length == 0) {
+                        accessorMethods.add(new MethodsToInvoke(method,null,false));
+                    }
+                }else{
+                	if(!method.getReturnType().equals(void.class)){
+                		Matcher m = METHODS_RETURNING_LISTS.matcher(method.toGenericString());
+                		if(m.matches()){
+                			String retType = m.group(1);
+                			if(retType.startsWith("com.salesforce.metadata") && retType.indexOf("DataCategory")==-1){
+                				//List returning another metadata class
+                				List<MethodsToInvoke> innerMethodsToInv = getAccessorMethods(Class.forName(retType));
+                				if(!innerMethodsToInv.isEmpty())
+                					accessorMethods.add(new MethodsToInvoke(method,innerMethodsToInv,true));
+                			}
+                		}
+                		m=METHODS_RETURNING_METADATA.matcher(method.toGenericString());
+                		if(m.matches()){
+                			String retType = m.group(1);
+                			if(retType.startsWith("com.salesforce.metadata") && retType.indexOf("DataCategory")==-1){
+                				List<MethodsToInvoke> innerMethodsToInv = getAccessorMethods(Class.forName(retType));
+                				if(!innerMethodsToInv.isEmpty())
+                					accessorMethods.add(new MethodsToInvoke(method,innerMethodsToInv,false));
+                			}
+                			
+                		}
+                	}
+                }
+          	
+            }
+              
+        }
+         return accessorMethods;
 
     }
     

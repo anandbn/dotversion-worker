@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.salesforce.metadata.ArticleTypeChannelDisplay;
 import com.salesforce.metadata.Metadata;
 import com.salesforce.metadata.MiniLayout;
 import com.salesforce.metadata.ObjectRelationship;
@@ -170,7 +171,7 @@ public class StandardNode implements Node {
         else if (	Metadata.class.isAssignableFrom(cls) || SearchLayouts.class.equals(cls) || 
         			Picklist.class.equals(cls) || SharedTo.class.equals(cls) ||
         			MiniLayout.class.equals(cls) || SummaryLayout.class.equals(cls) || ObjectRelationship.class.equals(cls) ||
-        			WorkflowEmailRecipient.class.equals(cls)) {
+        			WorkflowEmailRecipient.class.equals(cls) || ArticleTypeChannelDisplay.class.equals(cls)) {
             return NodeChildType.NODE;
         }
         else {
